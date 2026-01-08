@@ -1,0 +1,33 @@
+name: TuTienPlugin
+version: 1.0.0
+main: com.example.tutienplugin.TuTienPlugin
+description: A cultivation plugin for Minecraft
+api-version: 1.16
+commands:
+  tutien:
+    description: Main command for Tu Tien plugin
+    usage: /tutien
+  tuluyen:
+    description: Start cultivating
+    usage: /tuluyen
+  dung:
+    description: Stop current action
+    usage: /dung
+  canhgioi:
+    description: Check your current realm
+    usage: /canhgioi
+  dokiep:
+    description: Start breakthrough process
+    usage: /dokiep
+  addexp:
+        description: Thêm tu vi cho người chơi
+        usage: /addexp <player> <amount>
+        permission: tutien.admin
+  tt:
+    description: Check info
+    usage: /tt
+
+permissions:
+     tutien.admin:
+        description: Quyền admin của plugin tu tiên
+        default: op

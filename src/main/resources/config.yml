@@ -1,0 +1,19 @@
+# config.yml
+# Tu Tiên Plugin Configuration
+
+# Tốc độ tu luyện (tu vi/5 giây)
+tu-luyen-speed: 10
+
+# Bonus tu vi mỗi cảnh giới
+bonus-per-level: 5
+
+# Tốc độ hồi linh lực (mỗi 3 giây)
+linh-luc-regen: 5
+
+#vi trí đăng tiên
+dangtien:
+  world: "world"
+  x: 100
+  y: 64
+  z: 100
+  radius: 20  # Bán kính check (blocks)
