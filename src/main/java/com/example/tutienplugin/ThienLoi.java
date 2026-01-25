@@ -6,15 +6,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import java.util.*;
-import com.example.tutienplugin.PlayerData;
-import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.*;
-import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-import java.util.*;
 
 public class ThienLoi {
     private final TuTienPlugin plugin;
@@ -29,49 +20,41 @@ public class ThienLoi {
      * Check xem có cần gọi Thiên Lôi khi đột phá không
      */
     public boolean needThienLoi(CanhGioi currentRealm, CanhGioi targetRealm) {
-        // Case 1: Đột phá đại cảnh giới
-        if (isDifferentMajorRealm(currentRealm, targetRealm)) {
+        String currentName = currentRealm.getName();
+        String targetName = targetRealm.getName();
+
+        // ✅ PHÀM NHÂN lên bất kỳ cấp nào → KHÔNG cần độ kiếp
+        if (currentRealm == CanhGioi.PHAM_NHAN) {
+            return false;
+        }
+
+        // ✅ LUYỆN KHÍ nội bộ → KHÔNG cần độ kiếp
+        if (currentName.contains("Luyện Khí") && targetName.contains("Luyện Khí")) {
+            return false;
+        }
+
+        // ✅ Đổi đại cảnh giới (Luyện Khí → Trúc Cơ, v.v.)
+        String currentMajor = getMajorRealm(currentName);
+        String targetMajor = getMajorRealm(targetName);
+
+        if (!currentMajor.equals(targetMajor)) {
             return true;
         }
 
-        // Case 2: Lên trọng thiên mới
-        String currentName = currentRealm.getName();
-        String targetName = targetRealm.getName();
-        
-        // Lấy số trọng thiên
+        // ✅ Lên trọng thiên mới (trong cùng đại cảnh)
         String currentTrong = getTrongThien(currentName);
         String targetTrong = getTrongThien(targetName);
-        
+
         return !currentTrong.equals(targetTrong);
     }
 
-    public void handleNormalBreakthrough(Player player, CanhGioi nextRealm) {
-        PlayerData playerData = plugin.getCultivationManager().getPlayerData(player);
-        if (playerData != null) {
-            // Update player's realm
-            playerData.setCanhGioi(nextRealm);
-
-            // Notify player
-            player.sendMessage("§a✨ Đột phá thành công lên " + nextRealm.getName() + "!");
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
-
-            // Add any other effects or logic for normal breakthrough
+    private String getMajorRealm(String name) {
+        if (name.contains(" - ")) {
+            return name.split(" - ")[0];
         }
-    }
-    /**
-     * Kiểm tra xem có phải là 2 đại cảnh giới khác nhau không
-     */
-    private boolean isDifferentMajorRealm(CanhGioi r1, CanhGioi r2) {
-        // Lấy tên cảnh giới (bỏ phần trọng thiên)
-        String name1 = r1.getName().split(" ")[0];
-        String name2 = r2.getName().split(" ")[0];
-        return !name1.equals(name2);
+        return name;
     }
 
-    /**
-     * Lấy số trọng thiên từ tên
-     * Ví dụ: "Nhất Trọng Thiên" -> "1"
-     */
     private String getTrongThien(String name) {
         if (name.contains("Nhất Trọng")) return "1";
         if (name.contains("Nhị Trọng")) return "2";
@@ -86,59 +69,10 @@ public class ThienLoi {
     }
 
     /**
-     * Lấy tỷ lệ thành công
+     * Luôn thành công - chỉ fail nếu chết hoặc rời vùng
      */
-    public double getSuccessRate(CanhGioi currentRealm, CanhGioi targetRealm) {
-        // Nếu là đột phá đại cảnh giới
-        if (isDifferentMajorRealm(currentRealm, targetRealm)) {
-            int level = targetRealm.getLevel();
-            if (level >= 189) return 20.0;  // Lên Độ Kiếp
-            if (level >= 162) return 30.0;  // Lên Đại Thừa
-            if (level >= 135) return 40.0;  // Lên Hợp Thể
-            if (level >= 108) return 50.0;  // Lên Hóa Thần
-            if (level >= 81) return 60.0;   // Lên Nguyên Anh
-            if (level >= 54) return 70.0;   // Lên Kim Đan
-            if (level >= 27) return 80.0;   // Lên Trúc Cơ
-        } 
-        // Nếu là lên trọng thiên mới
-        else {
-            String targetTrong = getTrongThien(targetRealm.getName());
-            int trong = Integer.parseInt(targetTrong);
-            return Math.max(30.0, 90.0 - (trong * 5)); // 85% -> 45%
-        }
-
-        return 100.0; // Trong cùng một trọng thiên
-    }
-
     public boolean checkSuccess(Player player, int strikeCount) {
-        PlayerData playerData = plugin.getCultivationManager().getPlayerData(player);
-        if (playerData == null) return false;
-
-        CanhGioi currentRealm = playerData.getCanhGioi();
-        CanhGioi nextRealm = currentRealm.getNext();
-        
-        if (nextRealm == null) {
-            return true; // Đã đạt cảnh giới tối đa
-        }
-        
-        if (!needThienLoi(currentRealm, nextRealm)) {
-            return true; // Không cần độ kiếp
-        }
-        
-        double baseRate = getSuccessRate(currentRealm, nextRealm);
-        double currentRate = baseRate - (strikeCount * 5);
-
-        double tuViProgress = currentRealm.getProgress(playerData.getTuVi());
-        currentRate += tuViProgress * 10;
-
-        double healthPercent = player.getHealth() / player.getMaxHealth();
-        currentRate += healthPercent * 5;
-
-        if (player.hasPotionEffect(PotionEffectType.DAMAGE_RESISTANCE)) {
-            currentRate += 5;
-        }
-
-        return Math.random() * 100 < currentRate;
+        return true;
     }
 
     public void startDoKiep(Player player, CanhGioi currentRealm, CanhGioi nextRealm) {
@@ -153,73 +87,60 @@ public class ThienLoi {
             return;
         }
 
-        double baseRate = getSuccessRate(currentRealm, nextRealm);
         Location dangTienDai = player.getLocation();
 
-        // Thông báo tỷ lệ thành công
+        // Thông báo bắt đầu (không có tỷ lệ)
         player.sendMessage("");
         player.sendMessage("§6§l✧ THÔNG TIN ĐỘ KIẾP ✧");
-        player.sendMessage("§eTừ: §b" + currentRealm.getName() + " §e→ §a" + nextRealm.getName());
-        player.sendMessage("§eTỷ lệ thành công cơ bản: §b" + String.format("%.1f", getSuccessRate(currentRealm, nextRealm)) + "%");
-        player.sendMessage("§e➜ Giảm 5% mỗi đạo sét");
-        player.sendMessage("§e➜ +10% theo tiến độ tu vi");
-        player.sendMessage("§e➜ +5% theo máu còn lại");
-        player.sendMessage("§e➜ +5% nếu có buff kháng damage");
+        player.sendMessage("§eTừ: §b" + currentRealm.getName());
+        player.sendMessage("§eĐến: §a" + nextRealm.getName());
+        player.sendMessage("§c⚡ 9 đạo Thiên Lôi sẽ giáng xuống, mỗi đạo gây §480% máu§c!");
+        player.sendMessage("§e⚠ Không được rời khỏi vùng hoặc chết!");
         player.sendMessage("");
 
-        // Thông báo bắt đầu
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage("§6§l✧ THIÊN KIẾP ✧");
-        Bukkit.broadcastMessage("§eTu sĩ §f" + player.getName() + " §ebắt đầu §5Độ Kiếp§e tại Đăng Tiên Đài!");
-        
+        Bukkit.broadcastMessage("§eTu sĩ §f" + player.getName() + " §ebắt đầu §5Độ Kiếp§e!");
+        Bukkit.broadcastMessage("§eTừ §b" + currentRealm.getName() + " §e→ §a" + nextRealm.getName());
+        Bukkit.broadcastMessage("§c⚠ Khu vực bán kính " + PROTECTED_RADIUS + " blocks đã được bảo vệ!");
+        Bukkit.broadcastMessage("");
+
         // Lưu vị trí độ kiếp
         dangKiep.put(player.getUniqueId(), dangTienDai);
         World world = dangTienDai.getWorld();
-        
-        // Thông báo
-        Bukkit.broadcastMessage("§c⚠ Khu vực bán kính 20 blocks đã được thiết lập!");
-        Bukkit.broadcastMessage("§c⚡ 9 đạo Thiên Lôi sẽ giáng xuống, mỗi đạo gây §480% máu§c!");
-        Bukkit.broadcastMessage("");
-        
+
         // Hiệu ứng bắt đầu
         world.strikeLightningEffect(dangTienDai);
         world.playSound(dangTienDai, Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.5f);
         createBarrier(dangTienDai);
 
-        final int[] delay = {60};
+        // Task đánh sét
         new BukkitRunnable() {
             int count = 0;
 
             @Override
             public void run() {
+                // Check đã thoát hoặc chết
                 if (!dangKiep.containsKey(player.getUniqueId()) || player.isDead()) {
-                    handleFailure(player, "§4Độ Kiếp thất bại!");
+                    handleFailure(player, "§4Không chịu nổi Thiên Lôi!");
                     this.cancel();
                     return;
                 }
 
+                // Đã chịu đủ 9 đạo sét
                 if (count >= 9) {
                     handleSuccess(player);
                     this.cancel();
                     return;
                 }
 
-                // Đánh sét và check thành công
+                // Đánh sét
                 strikeLightning(player, count + 1);
-
-                if (!checkSuccess(player, count + 1)) {
-                    handleFailure(player, "§4Không đủ cơ duyên, độ kiếp thất bại!");
-                    this.cancel();
-                    return;
-                }
-
-                // Giảm delay mỗi đợt
-                delay[0] = Math.max(20, delay[0] - 5);
                 count++;
             }
-        }.runTaskTimer(plugin, 60L, delay[0]);
+        }.runTaskTimer(plugin, 60L, 40L); // 60 tick delay đầu, 40 tick (2s) giữa mỗi đạo
 
-        // Check vùng cấm
+        // Task check rời vùng
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -231,7 +152,7 @@ public class ThienLoi {
                 Location playerLoc = player.getLocation();
                 Location kiepLoc = dangKiep.get(player.getUniqueId());
 
-                if (playerLoc.distance(kiepLoc) > PROTECTED_RADIUS) {
+                if (kiepLoc != null && playerLoc.distance(kiepLoc) > PROTECTED_RADIUS) {
                     strikeProtectedArea(player);
                     player.sendMessage("§c⚠ Không được rời khỏi vùng độ kiếp!");
                 }
@@ -253,21 +174,22 @@ public class ThienLoi {
         double damage = player.getMaxHealth() * 0.8;
         player.damage(damage);
 
-        // Thông báo đạo sét
-        Bukkit.broadcastMessage("§c⚡ Thiên Lôi đạo thứ " + strikeCount + " giáng xuống!");
+        // Thông báo
+        Bukkit.broadcastMessage("§c⚡ Thiên Lôi đạo thứ §4" + strikeCount + "§c/9 giáng xuống §f" + player.getName() + "§c!");
 
-        // Hiệu ứng choáng
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 40, 2));
-        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 20, 1));
+        // Hiệu ứng choáng nhẹ
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 30, 1));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 15, 0));
     }
 
     private void createBarrier(Location center) {
         new BukkitRunnable() {
             double angle = 0;
+            int ticks = 0;
 
             @Override
             public void run() {
-                if (angle > Math.PI * 2) {
+                if (ticks > 100 || !dangKiep.containsValue(center)) {
                     this.cancel();
                     return;
                 }
@@ -276,37 +198,24 @@ public class ThienLoi {
                     double x = PROTECTED_RADIUS * Math.cos(angle);
                     double z = PROTECTED_RADIUS * Math.sin(angle);
                     Location loc = center.clone().add(x, y, z);
-
-                    // Try different particle types with fallback
-                    try {
-                        // Try BARRIER first (1.9+)
-                        center.getWorld().spawnParticle(Particle.valueOf("BARRIER"), loc, 1, 0, 0, 0, 0);
-                    } catch (Exception e1) {
-                        try {
-                            // Try BLOCK_CRACK with BARRIER material (1.8+)
-                            center.getWorld().spawnParticle(Particle.BLOCK_CRACK, loc, 1, 0, 0, 0, 0,
-                                    Material.BARRIER.createBlockData());
-                        } catch (Exception e2) {
-                            // Fallback to ENDER signal (works in most versions)
-                            center.getWorld().spawnParticle(Particle.END_ROD, loc, 2, 0.1, 0.1, 0.1, 0.01);
-                        }
-                    }
+                    center.getWorld().spawnParticle(Particle.END_ROD, loc, 1, 0, 0, 0, 0);
                 }
 
                 angle += Math.PI / 16;
+                if (angle > Math.PI * 2) angle = 0;
+                ticks++;
             }
-        }.runTaskTimer(plugin, 0L, 1L);
+        }.runTaskTimer(plugin, 0L, 2L);
     }
 
     private void strikeProtectedArea(Player player) {
         Location loc = player.getLocation();
         World world = loc.getWorld();
 
-        // Hiệu ứng sét trừng phạt
         world.strikeLightningEffect(loc);
         world.playSound(loc, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 1.0f, 0.5f);
 
-        // Gây sát thương 80% máu
+        // Phạt 80% máu
         double damage = player.getMaxHealth() * 0.8;
         player.damage(damage);
     }
@@ -318,23 +227,40 @@ public class ThienLoi {
         World world = loc.getWorld();
         if (world == null) return;
 
-        // Hiệu ứng thành công
+        // ✅ CẬP NHẬT CẢNH GIỚI
+        PlayerData data = plugin.getCultivationManager().getPlayerData(player);
+        if (data != null) {
+            CanhGioi current = data.getCanhGioi();
+            CanhGioi next = current.getNext();
+
+            // Nâng cấp
+            data.breakthrough(next);
+
+            // Tiếp tục auto nếu còn đủ tu vi
+            data.autoBreakthrough();
+
+            // Lưu
+            data.save(plugin.getDataFolder());
+
+            // Thông báo cảnh giới mới
+            Bukkit.broadcastMessage("");
+            Bukkit.broadcastMessage("§6§l✨ ĐỘ KIẾP THÀNH CÔNG ✨");
+            Bukkit.broadcastMessage("§eTu sĩ §f" + player.getName() + " §eđã vượt qua §59 đạo Thiên Lôi§e!");
+            Bukkit.broadcastMessage("§a➜ Đột phá thành công lên: §b" + data.getCanhGioi().getName());
+            Bukkit.broadcastMessage("");
+
+            player.sendMessage("§a✨ Chúc mừng đạo hữu đột phá thành công!");
+            player.sendMessage("§eCảnh giới hiện tại: §b" + data.getCanhGioi().getName());
+        }
+
+        // Hiệu ứng
         world.strikeLightningEffect(loc);
-        world.spawnParticle(Particle.EXPLOSION_HUGE, loc, 1);
+        world.spawnParticle(Particle.TOTEM, loc.clone().add(0, 1, 0), 100, 0.5, 1, 0.5, 0.5);
         world.playSound(loc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
-
-        // Thông báo
-        Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage("§6§l✨ ĐỘ KIẾP THÀNH CÔNG ✨");
-        Bukkit.broadcastMessage("§eTu sĩ §f" + player.getName() + " §eđã vượt qua §59 đạo Thiên Lôi§e!");
-        Bukkit.broadcastMessage("§a➜ Cảnh giới được nâng lên!");
-        Bukkit.broadcastMessage("");
-
-        // Xóa khỏi danh sách đang độ kiếp
-        dangKiep.remove(player.getUniqueId());
-
-        // Hiệu ứng cho người chơi
         player.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+
+        // Xóa trạng thái
+        dangKiep.remove(player.getUniqueId());
     }
 
     private void handleFailure(Player player, String reason) {
@@ -342,21 +268,20 @@ public class ThienLoi {
         if (loc != null) {
             World world = loc.getWorld();
             if (world != null) {
-                // Hiệu ứng thất bại
                 world.strikeLightning(loc);
                 world.spawnParticle(Particle.EXPLOSION_LARGE, loc, 10, 0.5, 0.5, 0.5, 0.1);
                 world.playSound(loc, Sound.ENTITY_WITHER_DEATH, 1.0f, 0.5f);
             }
         }
 
-        // Thông báo
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage("§4§l❌ ĐỘ KIẾP THẤT BẠI ❌");
         Bukkit.broadcastMessage("§eTu sĩ §f" + player.getName() + " §eđã thất bại trong §5Độ Kiếp§e!");
         Bukkit.broadcastMessage("§c➜ " + reason);
         Bukkit.broadcastMessage("");
 
-        // Xóa khỏi danh sách đang độ kiếp
+        player.sendMessage("§c❌ Độ kiếp thất bại! Hãy tu luyện thêm rồi thử lại.");
+
         dangKiep.remove(player.getUniqueId());
     }
 
@@ -367,6 +292,16 @@ public class ThienLoi {
     public void cancelDoKiep(Player player) {
         if (isDoingKiep(player)) {
             handleFailure(player, "§4Độ Kiếp bị hủy bỏ!");
+        }
+    }
+
+    // Method cho breakthrough thường (không cần độ kiếp)
+    public void handleNormalBreakthrough(Player player, CanhGioi nextRealm) {
+        PlayerData playerData = plugin.getCultivationManager().getPlayerData(player);
+        if (playerData != null) {
+            playerData.setCanhGioi(nextRealm);
+            player.sendMessage("§a✨ Đột phá thành công lên " + nextRealm.getName() + "!");
+            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
         }
     }
 }

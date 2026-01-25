@@ -29,8 +29,15 @@ public class CultivationManager implements Listener {
     }
 
     public PlayerData getPlayerData(Player player) {
-        return playerDataMap.computeIfAbsent(player.getUniqueId(),
-                k -> PlayerData.load(plugin.getDataFolder(), player));
+        PlayerData data = playerDataMap.computeIfAbsent(
+                player.getUniqueId(),
+                k -> PlayerData.load(plugin.getDataFolder(), player)
+        );
+
+        // ✅ Thêm dòng này
+        data.autoBreakthrough();
+
+        return data;
     }
 
     public void savePlayerData(Player player) {
@@ -59,7 +66,7 @@ public class CultivationManager implements Listener {
                         CanhGioi oldCanhGioi = data.getCanhGioi();
                         data.addTuVi(gain);
                         CanhGioi newCanhGioi = data.getCanhGioi();
-                        
+
                         // Check đột phá
                         if (newCanhGioi.getLevel() > oldCanhGioi.getLevel()) {
                             plugin.getServer().broadcastMessage("");
@@ -70,14 +77,14 @@ public class CultivationManager implements Listener {
                             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.5f, 1f);
                         }
-                        
+
                         // Hiệu ứng và thông báo
-                        player.spawnParticle(Particle.END_ROD, 
-                            player.getLocation().add(0, 1, 0), 
-                            10, 0.5, 0.5, 0.5, 0.02);
+                        player.spawnParticle(Particle.END_ROD,
+                                player.getLocation().add(0, 1, 0),
+                                10, 0.5, 0.5, 0.5, 0.02);
                         // Sử dụng title thay cho action bar
-                        String message = "§b⚡ Tu luyện... §e+" + gain + " tu vi §7| §d" + 
-                                      data.getTuVi() + "/" + data.getCanhGioi().getNextExp();
+                        String message = "§b⚡ Tu luyện... §e+" + gain + " tu vi §7| §d" +
+                                data.getTuVi() + "/" + data.getCanhGioi().getNextExp();
                         player.sendTitle("", message, 0, 40, 10);
                     }
                 }
@@ -136,7 +143,7 @@ public class CultivationManager implements Listener {
         // Hiệu ứng
         player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f);
         player.sendMessage("§a✨ Bắt đầu tu luyện!");
-        
+
         // Particle effect
         new BukkitRunnable() {
             @Override
@@ -145,7 +152,7 @@ public class CultivationManager implements Listener {
                     this.cancel();
                     return;
                 }
-                
+
                 Location particleLoc = player.getLocation().add(0, 0.5, 0);
                 player.getWorld().spawnParticle(Particle.END_ROD, particleLoc, 10, 0.3, 0.3, 0.3, 0.02);
             }
@@ -176,7 +183,7 @@ public class CultivationManager implements Listener {
         player.playSound(player.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 1f, 1f);
         player.sendMessage("§e🛑 Đã dừng tu luyện!");
     }
-    
+
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent e) {
         Player player = e.getPlayer();

@@ -48,6 +48,8 @@ public class TuCommand implements CommandExecutor, TabCompleter {
                 showTuLuyenInfo(player, data);
                 return true;
 
+
+
             default:
                 return false;
         }

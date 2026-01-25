@@ -5,7 +5,7 @@ import org.bukkit.ChatColor;
 
 public enum CanhGioi {
     // Phàm Nhân
-    PHAM_NHAN("Phàm Nhân", 0, 0, 0),
+    PHAM_NHAN("Phàm Nhân", 0, 0, 1_000),
 
     // Luyện Khí (9 tầng) - 1K -> 1M
     LUYEN_KHI_1_SO("Luyện Khí - Nhất Trọng Thiên Sơ Kỳ", 1, 1_000, 5_000),

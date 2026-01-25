@@ -94,7 +94,6 @@ public class TuTienPlugin extends JavaPlugin implements CommandExecutor {
             PlayerData data = cultivationManager.getPlayerData(target);
             CanhGioi oldRealm = data.getCanhGioi();
 
-            // ✅ TĂNG TU VI THẬT (HỆ CHÍNH)
             data.addTuVi(amount);
             cultivationManager.savePlayerData(target);
 
@@ -110,28 +109,48 @@ public class TuTienPlugin extends JavaPlugin implements CommandExecutor {
 
         /* ========== /dokiep ========== */
         if (cmd.getName().equalsIgnoreCase("dokiep")) {
-            if (!(sender instanceof Player player)) return true;
 
+            // Check phải là Player
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("§cChỉ player mới dùng được lệnh này!");
+                return true;
+            }
+            Player player = (Player) sender;
+
+            // Check vị trí Đăng Tiên Đài
             if (!isAtDangTienDai(player.getLocation())) {
                 player.sendMessage("§cBạn phải ở Đăng Tiên Đài!");
                 return true;
             }
 
+            // Lấy data
             PlayerData data = cultivationManager.getPlayerData(player);
-            CanhGioi cur = data.getCanhGioi();
-            CanhGioi next = cur.getNext();
+            CanhGioi current = data.getCanhGioi();
+            CanhGioi next = current.getNext();
 
-            if (next == null || data.getTuVi() < next.getRequiredExp()) {
-                player.sendMessage("§cTu vi chưa đủ!");
+            // Đã max level
+            if (next == null || next == current) {
+                player.sendMessage("§6Bạn đã đạt cảnh giới tối cao!");
                 return true;
             }
 
-            if (!thienLoi.needThienLoi(cur, next)) {
-                thienLoi.handleNormalBreakthrough(player, next);
+            // Chưa đủ tu vi
+            if (data.getTuVi() < next.getRequiredExp()) {
+                player.sendMessage("§cTu vi chưa đủ để đột phá!");
+                player.sendMessage("§eCần: §b" + formatExp(next.getRequiredExp()) + " §e| Hiện có: §b" + formatExp(data.getTuVi()));
                 return true;
             }
 
-            thienLoi.startDoKiep(player, cur, next);
+            // Không cần độ kiếp
+            if (!thienLoi.needThienLoi(current, next)) {
+                player.sendMessage("§aCảnh giới này tự đột phá, không cần độ kiếp!");
+                data.autoBreakthrough();
+                cultivationManager.savePlayerData(player);
+                return true;
+            }
+
+            // Bắt đầu độ kiếp
+            thienLoi.startDoKiep(player, current, next);
             return true;
         }
 
@@ -149,8 +168,11 @@ public class TuTienPlugin extends JavaPlugin implements CommandExecutor {
         int z = getConfig().getInt("dangtien.z");
         int r = getConfig().getInt("dangtien.radius", 20);
 
+        if (world == null || loc.getWorld() == null) return false;
         if (!loc.getWorld().getName().equals(world)) return false;
-        return loc.distance(new Location(loc.getWorld(), x, y, z)) <= r;
+
+        Location center = new Location(loc.getWorld(), x, y, z);
+        return loc.distance(center) <= r;
     }
 
     private long parseExp(String s) {
@@ -174,5 +196,9 @@ public class TuTienPlugin extends JavaPlugin implements CommandExecutor {
 
     public CultivationManager getCultivationManager() {
         return cultivationManager;
+    }
+
+    public ThienLoi getThienLoi() {
+        return thienLoi;
     }
 }

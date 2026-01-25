@@ -47,19 +47,47 @@ public class PlayerData {
     // Thêm tu vi
     public void addTuVi(long amount) {
         this.tuVi += amount;
-        updateCanhGioi();
+        autoBreakthrough();
     }
 
-    // Cập nhật cảnh giới dựa trên tu vi
-    private void updateCanhGioi() {
-        CanhGioi newCanhGioi = CanhGioi.fromExp(this.tuVi);
-        if (newCanhGioi.getLevel() > this.canhGioi.getLevel()) {
-            this.canhGioi = newCanhGioi;
-            // Tăng max linh lực khi lên cảnh giới
-            this.maxLinhLuc = 100 + (canhGioi.getLevel() * 50);
-            this.linhLuc = this.maxLinhLuc; // Hồi đầy linh lực
+    public void autoBreakthrough() {
+        while (true) {
+            // ✅ Lấy cảnh giới TIẾP THEO (chỉ 1 cấp)
+            CanhGioi nextRealm = this.canhGioi.getNext();
+
+            // Đã max level
+            if (nextRealm == this.canhGioi) return;
+
+            // Chưa đủ tu vi để lên cấp tiếp theo
+            if (this.tuVi < nextRealm.getRequiredExp()) return;
+
+            // Cần độ kiếp → DỪNG
+            if (TuTienPlugin.getInstance()
+                    .getThienLoi()
+                    .needThienLoi(this.canhGioi, nextRealm)) {
+                return;
+            }
+
+            // ✅ Nâng lên 1 cấp
+            breakthrough(nextRealm);
+
+            // Vòng lặp tiếp tục kiểm tra cấp tiếp theo
         }
     }
+
+    public boolean canBreakthrough() {
+        CanhGioi target = CanhGioi.fromExp(this.tuVi);
+        return target.getLevel() > this.canhGioi.getLevel();
+    }
+
+    public void breakthrough(CanhGioi target) {
+        this.canhGioi = target;
+        this.maxLinhLuc = 100 + target.getLevel() * 50;
+        this.linhLuc = this.maxLinhLuc;
+    }
+
+
+
 
     // Tiêu hao linh lực
     public boolean useLinhLuc(double amount) {
@@ -93,7 +121,7 @@ public class PlayerData {
         if (!playersFolder.exists()) {
             playersFolder.mkdirs();
         }
-        
+
         File file = new File(playersFolder, uuid.toString() + ".yml");
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
 
@@ -124,28 +152,26 @@ public class PlayerData {
         data.tuVi = config.getLong("tuvi", 0);
         data.linhLuc = config.getDouble("linhluc", 100);
         data.maxLinhLuc = config.getDouble("maxlinhluc", 100);
-        
-        // Xử lý cảnh giới với try-catch để tránh lỗi nếu giá trị không hợp lệ
+
         try {
             String canhGioiStr = config.getString("canhgioi", "PHAM_NHAN");
             data.canhGioi = CanhGioi.valueOf(canhGioiStr);
         } catch (IllegalArgumentException e) {
-            // Nếu giá trị không hợp lệ, tự động tính lại từ tu vi
             data.canhGioi = CanhGioi.fromExp(data.tuVi);
         }
-        
-        // Đảm bảo cảnh giới khớp với tu vi (đồng bộ lại)
-        CanhGioi correctCanhGioi = CanhGioi.fromExp(data.tuVi);
-        if (correctCanhGioi.getLevel() != data.canhGioi.getLevel()) {
-            data.canhGioi = correctCanhGioi;
-            // Cập nhật lại max linh lực theo cảnh giới đúng
-            data.maxLinhLuc = 100 + (data.canhGioi.getLevel() * 50);
-            // Đảm bảo linh lực không vượt quá max
-            if (data.linhLuc > data.maxLinhLuc) {
-                data.linhLuc = data.maxLinhLuc;
-            }
-        }
+
+        // ✅ FIX: Gọi autoBreakthrough() - nó đã kiểm tra needThienLoi() rồi
+        data.autoBreakthrough();
 
         return data;
     }
+
+
+
+    private boolean isMinorStageUpgrade(CanhGioi current, CanhGioi target) {
+        // cùng đại cảnh (level) nhưng exp mốc cao hơn
+        return current.getLevel() == target.getLevel()
+                && target.getRequiredExp() > current.getRequiredExp();
+    }
+
 }
